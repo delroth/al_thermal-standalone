@@ -161,7 +161,7 @@ static int al_thermal_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	np = of_find_compatible_node(NULL, NULL, "annapurna-labs,al-pbs");
+	np = of_find_compatible_node(NULL, NULL, "al,alpine-pbs");
 
 	if (!np) {
 		pr_err("%s: Failed: PBS DT data not available\n", __func__);
