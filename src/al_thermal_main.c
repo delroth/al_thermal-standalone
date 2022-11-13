@@ -25,6 +25,9 @@
 
 #define TIMEOUT_MS	1000
 
+int thermal_add_hwmon_sysfs(struct thermal_zone_device *tz);
+void thermal_remove_hwmon_sysfs(struct thermal_zone_device *tz);
+
 struct al_thermal_dev {
 	struct al_thermal_sensor_handle handle;
 };
@@ -210,6 +213,9 @@ static int al_thermal_probe(struct platform_device *pdev)
 		}
 	}
 
+	if (thermal_add_hwmon_sysfs(al_thermal) < 0)
+		pr_warn("%s: could not add hwmon sysfs\n", __func__);
+
 	platform_set_drvdata(pdev, al_thermal);
 
 	pr_info("%s: Thermal Sensor Loaded at: 0x%p.\n",
@@ -223,6 +229,7 @@ static int al_thermal_exit(struct platform_device *pdev)
 	struct thermal_zone_device *al_thermal = platform_get_drvdata(pdev);
 	struct al_thermal_dev *al_dev = al_thermal->devdata;
 
+	thermal_remove_hwmon_sysfs(al_thermal);
 	thermal_zone_device_unregister(al_thermal);
 	platform_set_drvdata(pdev, NULL);
 
