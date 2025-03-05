@@ -54,9 +54,9 @@ static inline int thermal_enable(
 	return 0;
 }
 
-static inline int __thermal_get_temp(void *devdata, int *temp)
+static inline int thermal_get_temp(struct thermal_zone_device *thermal, int *temp)
 {
-	struct al_thermal_dev *al_dev = devdata;
+	struct al_thermal_dev *al_dev = thermal_zone_device_priv(thermal);
 	int timeout;
 	long temp1;
 
@@ -82,25 +82,6 @@ static inline int __thermal_get_temp(void *devdata, int *temp)
 	return 0;
 }
 
-static inline int thermal_get_temp(struct thermal_zone_device *thermal,
-				int *temp)
-{
-	int temp_md;
-	int err;
-
-	err = __thermal_get_temp(thermal->devdata, &temp_md);
-	if (err)
-		return err;
-
-	*temp = temp_md;
-
-	return 0;
-}
-
-static struct thermal_zone_of_device_ops of_ops = {
-	.get_temp = __thermal_get_temp,
-};
-
 static struct thermal_zone_device_ops ops = {
 	.get_temp = thermal_get_temp,
 };
@@ -110,7 +91,7 @@ static int al_thermal_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct thermal_zone_device *al_thermal = platform_get_drvdata(pdev);
-	struct al_thermal_dev *al_dev = al_thermal->devdata;
+	struct al_thermal_dev *al_dev = thermal_zone_device_priv(al_thermal);
 
 	/* Disable Annapurna Labs Thermal Sensor */
 	al_thermal_sensor_enable_set(&al_dev->handle, 0);
@@ -124,7 +105,7 @@ static int al_thermal_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct thermal_zone_device *al_thermal = platform_get_drvdata(pdev);
-	struct al_thermal_dev *al_dev = al_thermal->devdata;
+	struct al_thermal_dev *al_dev = thermal_zone_device_priv(al_thermal);
 	int err = 0;
 
 	/* Enable Annapurna Labs Thermal Sensor */
@@ -200,17 +181,11 @@ static int al_thermal_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	al_thermal = thermal_zone_of_sensor_register(&pdev->dev, 0, al_dev, &of_ops);
+	al_thermal = devm_thermal_of_zone_register(&pdev->dev, 0, al_dev, &ops);
 	if (IS_ERR(al_thermal)) {
-		pr_err("%s: falling back to thermal_zone_device_register...\n", __func__);
-
-		al_thermal = thermal_zone_device_register("al_thermal", 0, 0,
-				al_dev, &ops, NULL, 0, 0);
-		if (IS_ERR(al_thermal)) {
-			pr_err("%s: thermal zone device is NULL\n", __func__);
-			err = PTR_ERR(al_thermal);
-			return err;
-		}
+		pr_err("%s: thermal zone device is NULL\n", __func__);
+		err = PTR_ERR(al_thermal);
+		return err;
 	}
 
 	if (thermal_add_hwmon_sysfs(al_thermal) < 0)
@@ -224,18 +199,16 @@ static int al_thermal_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int al_thermal_exit(struct platform_device *pdev)
+static void al_thermal_exit(struct platform_device *pdev)
 {
 	struct thermal_zone_device *al_thermal = platform_get_drvdata(pdev);
-	struct al_thermal_dev *al_dev = al_thermal->devdata;
+	struct al_thermal_dev *al_dev = thermal_zone_device_priv(al_thermal);
 
 	thermal_remove_hwmon_sysfs(al_thermal);
 	thermal_zone_device_unregister(al_thermal);
 	platform_set_drvdata(pdev, NULL);
 
 	al_thermal_sensor_enable_set(&al_dev->handle, 0);
-
-	return 0;
 }
 
 static const struct of_device_id al_thermal_id_table[] = {
